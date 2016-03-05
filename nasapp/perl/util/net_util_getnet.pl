@@ -14,11 +14,12 @@ require "/nasapp/perl/lib/log_db_lib.pl";
 #Minging.Tsai. 2013/12/15   Called by alert_agent now.
 
 #Check counter of net_getnetinfo.pl
+$LOG = 0;
 open(my $IN, "ps ax | grep -c \"/usr/bin/perl /nasapp/perl/util/net_util_getnet.pl\" |");
 while(<$IN>) {
 	if (/(\d+)/) {
 		$process_count = $1;
-		print "process_count=$process_count\n";
+		#print "process_count=$process_count\n";
 		if ($process_count >= 4) {
 			print "[net_util_getnet]: program execute over once!!!!\n";
 			exit 0;
@@ -29,62 +30,63 @@ close($IN);
 
 # SN
 # We may not get the SN on nas gateway, so here we use MAC of eth0 to be serial number.
-my $eth0_mac = "";
-open(my $IN, "ethtool -e eth0 offset 0x0 length 6 |");
-while(<$IN>) {
-	if(/\S+\s+(\S+\s+\S+\s+\S+\s+\S+\s+\S+\s+\S+)/) {
-		$eth0_mac = $1;
-		$eth0_mac =~ s/ //g;
-	}
-}
-close($IN);
+#my $eth0_mac = "";
+#open(my $IN, "ethtool -e eth0 offset 0x0 length 6 |");
+#print "SOSA IN= $IN\n";
+#while(<$IN>) {
+#	if(/\S+\s+(\S+\s+\S+\s+\S+\s+\S+\s+\S+\s+\S+)/) {
+#		$eth0_mac = $1;
+#		$eth0_mac =~ s/ //g;
+#	}
+#}
+#close($IN);
 
-print "eth0_mac = $eth0_mac\n";
+#print "eth0_mac = $eth0_mac\n";
 #Encrypt the serial number.
 #$SN = MAC_encrypt($eth0_mac);
 $SN = $eth0_mac;
 #print "Encrypted serial_number = $SN\n";
-print "Serial_number = $SN\n";
+#print "Serial_number = $SN\n";
 
-if(-e "/nasdata/config/etc/sn") {
-	my $node_sn = `cat /nasdata/config/etc/sn`;
-	chomp($node_sn);
-	if($node_sn ne $SN) {#This shouldn't happen since the eth0 MAC and sn shouldn't change.
-		system("echo \"$SN\" >/nasdata/config/etc/sn");
-		naslog($LOG_NAS_CONFIG, $LOG_ERROR, "01", "NAS gateway serial number changed from $node_sn to $SN. It shouldn't happen.");
-	}
-} else {
-	system("echo \"$SN\" >/nasdata/config/etc/sn");
-}
+#if(-e "/nasdata/config/etc/sn") {
+#	my $node_sn = `cat /nasdata/config/etc/sn`;
+#	chomp($node_sn);
+#	if($node_sn ne $SN) {#This shouldn't happen since the eth0 MAC and sn shouldn't change.
+#		system("echo \"$SN\" >/nasdata/config/etc/sn");
+#		naslog($LOG_NAS_CONFIG, $LOG_ERROR, "01", "NAS gateway serial number changed from $node_sn to $SN. It shouldn't happen.");
+#	}
+#} else {
+#	system("echo \"$SN\" >/nasdata/config/etc/sn");
+#}
 
 #Minging.Tsai. 2014/7/24.
 #Get NASGW SSN
-my $SSN = $SN;#To prevent the NASGW doesn't have SSN.
-my $tmp_SSN = `/usr/local/sbin/sys_ssn.sh get`;
-print "tmp_SSN1=$tmp_SSN\n";
-$tmp_SSN =~ s/ //g;
-print "tmp_SSN2=$tmp_SSN\n";
-$tmp_SSN =~ /\"(\S+)\"/;
-print "SSN3=$SSN\n";
-$SSN = $1 if($1 ne "");
+#my $SSN = $SN;#To prevent the NASGW doesn't have SSN.
+#my $tmp_SSN = `/usr/local/sbin/sys_ssn.sh get`;
+#print "tmp_SSN1=$tmp_SSN\n";
+#$tmp_SSN =~ s/ //g;
+#print "tmp_SSN2=$tmp_SSN\n";
+#$tmp_SSN =~ /\"(\S+)\"/;
+#print "SSN3=$SSN\n";
+#$SSN = $1 if($1 ne "");
 
-my $serial_number = $SN . "|" . $SSN;
-print "serial_number=$serial_number\n";
+#my $serial_number = $SN . "|" . $SSN;
+#print "serial_number=$serial_number\n";
 # Product Name
-open(my $IN,"</etc/config/product");
-while(<$IN>) {
-	if ( /^NAME\s*=\s*(\S+)/ ) {
-		$prdname = $1;
-	}
-	elsif ( /^BASE\s*=\s*(\S+)/ ) {
-		$basename = $1;
-	}
-}
-close($IN);
+#open(my $IN,"</etc/config/product");
+#while(<$IN>) {
+#	if ( /^NAME\s*=\s*(\S+)/ ) {
+#		$prdname = $1;
+#	}
+#	elsif ( /^BASE\s*=\s*(\S+)/ ) {
+#		$basename = $1;
+#	}
+#}
+#close($IN);
 
 # Hostname
 $hostname = `/bin/hostname`;
-print "SOSA hostname=$hostname \n";
+#print "SOSA hostname=$hostname";
 chomp($hostname);
 
 my @inf = ();
@@ -93,59 +95,68 @@ my @ip = (x,x,x,x,x,x);
 my @netmask = (x,x,x,x,x,x);
 my @gw = (x,x,x,x,x,x);
 
-$ETH_PORT_NUM = 6;
+$ETH_PORT_NUM = 2;#SOSA andy change to 2
 
 for($i=0; $i < $ETH_PORT_NUM; $i++) {
 	my $config_file="/etc/config/eth".$i;
-
-    $ifcon = `$IFCONFIG_CMD eth$i`;
+	if ($LOG){
+	print "SOSA my config_file= $config_file\n";
+    	}
+	$ifcon = `$IFCONFIG_CMD eth$i`;
 	if ( $ifcon eq "" ) {
 		# Minging.Tsai. 2013/9/2. This NAS gateway doesn't have this port.
 		$inf[$i] = "NA";
 	}
 	next if($inf[$i] eq "NA");
-
-	open(my $IN,"<$config_file");
-	while(<$IN>){
-		if ( /^BOND=(\S+)/ ) {
-			if($1 eq "NO") {
-				$inf[$i] = "eth".$i;
-			}
-		}
-		elsif ( $inf[$i] ne "eth".$i && /^BOND_GROUP=(\d+)/ ) {
-			$inf[$i] = "bond".$1;
-		}
-		elsif ( /^MODE=(\S+)/ ) {
-			$bond_mode[$i] = $1;
-		}
-	}
-	close($IN);
+	
+	 $inf[$i] = "eth".$i;
+	#open(my $IN,"<$config_file");
+	#while(<$IN>){
+	#	if ( /^BOND=(\S+)/ ) {
+	#		if($1 eq "NO") {
+	#			$inf[$i] = "eth".$i;
+	#		}
+	#	}
+	#	elsif ( $inf[$i] ne "eth".$i && /^BOND_GROUP=(\d+)/ ) {
+	#		$inf[$i] = "bond".$1;
+	#	}
+	#	elsif ( /^MODE=(\S+)/ ) {
+	#		$bond_mode[$i] = $1;
+	#	}
+	#}
+	#close($IN);
 	# BOND=YES without BOND_GROUP
 }
-
+#investiage here!!!!!!
 # IP & Netmask & Gateway
 my $bond1_gw = "0.0.0.0";
 for($i=0; $i < $ETH_PORT_NUM; $i++) {
 	next if($inf[$i] eq "NA");
 	$ifconfig = `$IFCONFIG_CMD $inf[$i]|$GREP_CMD inet`;
+	#SOSA andy
+	if ($LOG){
+	print("SOSA andy inf[$i] = $inf[$i] \n");
+	print("SOSA andy ifconfig = $ifconfig \n");
+	}
 	if ( $ifconfig =~ /inet\s+addr:(\S+)\s+Bcast:\S+\s+Mask:(\S+)/ ) {
 		$ip[$i] = $1;
-		print "ip[$i]=$ip[$i]\n";
+		#print "SOSA andy!!! ip[$i]=$ip[$i]\n";
 		$netmask[$i] = $2;
+		#print "SOSA andy!!!! netmask[$i]=$netmask[$i]\n";
 	}
 #    print "$ROUTE_CMD -n -A inet|$GREP_CMD UG|$GREP_CMD $inf[$i]\n";
 #	$route = `$ROUTE_CMD -n -A inet|$GREP_CMD UG|$GREP_CMD $inf[$i]`;
-	$cmd = "ip route list table ".$inf[$i]."_t";
-	print "$cmd\n";
+#	$cmd = "ip route list table ".$inf[$i]."_t";
+#	print "$cmd\n";
 	$route = `$cmd`;
 	#if ( $route =~ /(\S+)\s+(\S+)\s+(\S+)\s+UG/ ) {
-    if ( $route =~ /default via (\S+) dev bond/ ) {
-		$gw[$i] = $1;
-		$bond1_gw = $1 if($inf[$i] eq "bond1");
-		print "\$gw[$i]=$gw[$i]\n";
-    } else {
-		$gw[$i] = "0.0.0.0";
-	}
+#    if ( $route =~ /default via (\S+) dev bond/ ) {
+#		$gw[$i] = $1;
+#		$bond1_gw = $1 if($inf[$i] eq "bond1");
+#		print "\$gw[$i]=$gw[$i]\n";
+ #   } else {
+#		$gw[$i] = "0.0.0.0";
+#	}
 }
 for($i=0; $i < $ETH_PORT_NUM; $i++) {
 	next if($inf[$i] eq "NA");#Minging.Tsai. 2013/9/16.
@@ -161,21 +172,21 @@ my $Helios_Join_sn = "none";
 my $NAS_VIP = "none";
 my $NAS_GW = "none";
 my $CLUSTER_SN = "none";
-open(my $IN, "<$JOIN_CONF");
-while(<$IN>) {
-	if(/HELIOS_JOIN=(\S+)/) {
-		$Helios_Join = $1;
-	} elsif(/HELIOS_JOIN_SN=(\S+)/) {
-		$Helios_Join_sn = $1;
-	} elsif(/VIP=(\S+)/) {
-		$NAS_VIP = $1;
-	} elsif(/GW=(\S+)/) {
-		$NAS_GW = $1;
-	} elsif(/CLUSTER_SN=(\S+)/) {
-		$CLUSTER_SN = $1;
-	}
-}
-close($IN);
+#open(my $IN, "<$JOIN_CONF");
+#while(<$IN>) {
+#	if(/HELIOS_JOIN=(\S+)/) {
+#		$Helios_Join = $1;
+#	} elsif(/HELIOS_JOIN_SN=(\S+)/) {
+#		$Helios_Join_sn = $1;
+#	} elsif(/VIP=(\S+)/) {
+#		$NAS_VIP = $1;
+#	} elsif(/GW=(\S+)/) {
+#		$NAS_GW = $1;
+#	} elsif(/CLUSTER_SN=(\S+)/) {
+#		$CLUSTER_SN = $1;
+#	}
+#}
+#close($IN);
 
 $NAS_VIP = $NAS_VIP . "|" . $CLUSTER_SN;
 
@@ -208,10 +219,10 @@ my $Status = "";#The Status will now indicate not only the NAS gateway status bu
 
 #Get the Link info.
 my @eth_info = get_eth_status();
-for($i = 0; $i < 6; $i++) {
+for($i = 0; $i < $ETH_PORT_NUM; $i++) {
     $speed[$i] = ($eth_info[$i]{"LINK"} eq 0 || $eth_info[$i]{"LINK"} eq "")? 0 : $eth_info[$i]{'SPEED'};
 
-    print "speed[$i]=$speed[$i]\n";
+    #print "speed[$i]=$speed[$i]\n";
 
 	$Status .= $eth_info[$i]{'LINK'} ne "" ? $eth_info[$i]{'LINK'} : 0;#In case we cannot get info.
 }
@@ -226,47 +237,47 @@ if($eth_info[7]{'LINK'}) {
 	$Status .= 0;#bond1 
 }
 
-if($eth_info[6]{'LINK'} == 0) {
-	print "Ethernet bond0 is not connected.\n";
-	write_status_detail("Eth_bond0", 2);
-} else {
-	print "Ethernet bond0 is connected.\n";
-	write_status_detail("Eth_bond0", 0);
-}
+#if($eth_info[6]{'LINK'} == 0) {
+#	print "Ethernet bond0 is not connected.\n";
+#	write_status_detail("Eth_bond0", 2);
+#} else {
+#	print "Ethernet bond0 is connected.\n";
+#	write_status_detail("Eth_bond0", 0);
+#}
 
-if($eth_info[7]{'LINK'} == 0) {
-	print "Ethernet bond1 is not connected.\n";
-	write_status_detail("Eth_bond1", 2);
-} elsif($bond1_gw_reachable == 0) {
-	print "Ethernet bond1 is connected but cannot reach gw ip.\n";
-	write_status_detail("Eth_bond1", 1);
-} else {
-	print "Ethernet bond1 is connected.\n";
-	write_status_detail("Eth_bond1", 0);
-} 
+#if($eth_info[7]{'LINK'} == 0) {
+#	print "Ethernet bond1 is not connected.\n";
+#	write_status_detail("Eth_bond1", 2);
+#} elsif($bond1_gw_reachable == 0) {
+#	print "Ethernet bond1 is connected but cannot reach gw ip.\n";
+#	write_status_detail("Eth_bond1", 1);
+#} else {
+#	print "Ethernet bond1 is connected.\n";
+#	write_status_detail("Eth_bond1", 0);
+#} 
 
 #Get FC information.
 
-@fc_info = get_fc_status();
-@FCWWN = ();
-$Status .= $fc_info[0]{"LINK"} eq Online ? 1 : 0;#Convert Online/Linkdown to 0/1
-$Status .= $fc_info[1]{"LINK"} eq Online ? 1 : 0;#Convert Online/Linkdown to 0/1
+#@fc_info = get_fc_status();
+#@FCWWN = ();
+#$Status .= $fc_info[0]{"LINK"} eq Online ? 1 : 0;#Convert Online/Linkdown to 0/1
+#$Status .= $fc_info[1]{"LINK"} eq Online ? 1 : 0;#Convert Online/Linkdown to 0/1
 
-if($fc_info[0]{"LINK"} ne Online && $fc_info[1]{"LINK"} ne Online) {
-	print "Both fiber channels are offline.\n";
-	write_status_detail("Fiber", 2);
-} else {
-	print "One or more fiber channel is online.\n";
-	write_status_detail("Fiber", 0);
-}
+#if($fc_info[0]{"LINK"} ne Online && $fc_info[1]{"LINK"} ne Online) {
+#	print "Both fiber channels are offline.\n";
+#	write_status_detail("Fiber", 2);
+#} else {
+#	print "One or more fiber channel is online.\n";
+#	write_status_detail("Fiber", 0);
+#}
 
 
 $FCWWN[0] = $fc_info[0]{"WWPN"};
 $FCWWN[1] = $fc_info[1]{"WWPN"};
 $FCWWN[0] = "0FCWWN0" if($FCWWN[0] eq "");
 $FCWWN[1] = "0FCWWN1" if($FCWWN[1] eq "");
-print "FCWWN[0]=$FCWWN[0]\n";
-print "FCWWN[1]=$FCWWN[1]\n";
+#print "FCWWN[0]=$FCWWN[0]\n";
+#print "FCWWN[1]=$FCWWN[1]\n";
 
 
 #Minging.Tsai. 2013/10/3.
@@ -321,7 +332,7 @@ $Status .= $sys_sta_Fiber;
 $Status .= $sys_sta_Domain;
 $Status .= $sys_sta_Cluster;
 
-print "Status=$Status\n";
+#print "Status=$Status\n";
 
 #Minging.Tsai. 2013/10/16.
 #Get NAS GW model.
@@ -334,18 +345,28 @@ if($inf[4] ne "NA") {
 open(LOCKFILE, ">/tmp/getnet_lock") or die "/tmp/getnet_lock: $!";
 flock(LOCKFILE, LOCK_EX) or die "flock() failed for /tmp/getnet_lock: $!";
 
+
+#SOSA andy put network information to /tmp/c_netinfo_tmp
 open(my $OUT,">/tmp/c_netinfo_tmp");
-print "SOSA OUT\n";
-print "SOSA NAS_VIP=$NAS_VIP\n";
-print $OUT "$hostname&$serial_number&$Helios_Join&$Helios_Join_sn&$NAS_VIP&$FW_VER&$Status&$FCWWN[0]&$FCWWN[1]&$model_name&&&";#Minging.Tsai. 2013/7/2, 2013/8/13
-print "$hostname&$serial_number&$Helios_Join&$Helios_Join_sn&$NAS_VIP&$FW_VER&$Status&$FCWWN[0]&$FCWWN[1]&$model_name&&&\n";#Minging.Tsai. 2013/7/2, 2013/8/13
+#print "SOSA $OUT\n";
+#print "SOSA NAS_VIP=$NAS_VIP\n";
+#print $OUT "$hostname&$serial_number&$Helios_Join&$Helios_Join_sn&$NAS_VIP&$FW_VER&$Status&$FCWWN[0]&$FCWWN[1]&$model_name&&&";#Minging.Tsai. 2013/7/2, 2013/8/13
+#print "$hostname&$serial_number&$Helios_Join&$Helios_Join_sn&$NAS_VIP&$FW_VER&$Status&$FCWWN[0]&$FCWWN[1]&$model_name&&&\n";#Minging.Tsai. 2013/7/2, 2013/8/13
+
+#print "SOSA ETH_PORT_NUM = $ETH_PORT_NUM\n";
+
+#for($i=0; $i < $ETH_PORT_NUM; $i++) {
 for($i=0; $i < $ETH_PORT_NUM; $i++) {
 	print $OUT "$inf[$i]&$ip[$i]&$netmask[$i]&$gw[$i]&&";
+	#print $OUT "$ip[$i]&$netmask[$i]&&";
 }
 print $OUT "\n";
 close($OUT);
 
 system("mv /tmp/c_netinfo_tmp /tmp/c_netinfo_multi");
+
+print("Content of /tmp/c_netinfo_multi\n");
+system("cat /tmp/c_netinfo_multi");
 
 close LOCKFILE;
 exit 0;

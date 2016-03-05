@@ -16,10 +16,10 @@ if ( $argc != 1 ) {
 	print "$argc != 1, then exit\n";
 	exit(0);
 }
-if( -f "/tmp/setnet" ) {
-	print "if( -f /tmp/setnet ) exit\n";
-	exit(0);
-}
+#f( -f "/tmp/setnet" ) {
+#print "if( -f /tmp/setnet ) exit\n";
+#exit(0);
+#
 
 open( OUT,">/tmp/setnet" );
 print OUT "$source\n";
@@ -42,7 +42,7 @@ close(OUT);
 #Minging.Tsai.
 #Disable the bond1 whenever we change the network setting.
 my $ret = 0;
-system("ifconfig bond1 down");
+system("ifconfig eth0 down");
 if($source ne $last_source) {
 	#Set the config if needed.
 	$ret = set_netconf($source);
@@ -51,15 +51,26 @@ if($source ne $last_source) {
 exit 1 if($ret == 1);
 
 naslog($NET_EVENT, $LOG_INFORMATION, "100", "Change netowrk setting and restart network.");
-system("$NETWORK_SCRIPT restart >/dev/null 2>/dev/null");
+#ystem("$NETWORK_SCRIPT restart >/dev/null 2>/dev/null");
 
 sleep 1;
 
 unlink("/tmp/setnet");
-system("ifconfig bond1 up");
+#SOSA andy
+system("ifconfig eth0 up");
+system("/etc/init.d/networking restart");
+#system("ifconfig bond1 up");
 
-system("/etc/init.d/keepalived restart");
-system("/nasapp/perl/util/lvsng_chktimestamp.pl &");#Check timstamp.
+system("rm -rf /tmp/c_netinfo_multi");
+print("Kill fagent+\n");
+system("killall -9 fagent_exe");
+print("restart fagent\n");
+system("/root/fagent+/fagent_exe -I SOSAandy3 -S 23058 -C 23059 -i eth0 &");
+print("delete /tmp/fagent+\n");
+system("rm /tmp/fagent+");
+
+#system("/etc/init.d/keepalived restart");
+#system("/nasapp/perl/util/lvsng_chktimestamp.pl &");#Check timstamp.
 
 #Minging.Tsai. 2014/7/14. Force update node info after set network.
 system("/nasapp/perl/util/net_util_getnet.pl");
